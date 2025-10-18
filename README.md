@@ -5,5 +5,3 @@
 [Click here to view my statistical summaries and graphs](https://alt392.github.io/BIOST-Project-2/M2-Lab-2141.html)
 
 
-## Overall Summary
-
