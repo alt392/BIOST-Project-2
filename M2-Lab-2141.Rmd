@@ -1,0 +1,263 @@
+---
+title: "M2 Lab Template"
+author: "Ally Tirendi"
+output: 
+  html_document:
+    df_print: paged
+    toc: true
+    number_sections: false
+    toc_depth: '3'
+    code_folding: show
+---
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# this is a set-up chunk
+# DON'T CHANGE THESE SETTINGS--I'VE SET THEM UP TO MAKE THINGS RUN SMOOTHLY 
+require(knitr)
+try(knitr::opts_chunk$set(echo = TRUE, error = TRUE, 
+                      root.dir = rprojroot::find_rstudio_root_file()), silent = T)
+
+try(knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file()), silent = T
+)
+
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+```
+
+
+
+# Part 1
+
+## Probability of clinicially significant decline for placebo
+
+
+```{r error=T}
+# placebo group probability 
+pnorm(-2,mean = -1.8, sd = 4.3)
+
+
+```
+
+There is a ~48.1% chance that a randomly selected woman in the placebo group shows a clinically significant decline in bone-mineral density meaning a decline of 2% or more.
+
+## Probability of clinicially significant decline for treatment
+
+
+```{r}
+
+# treatment group probability
+pnorm(-2,mean=3.5,sd=4.2)
+```
+
+There is a ~9.5% chance that a randomly selected woman in the treatment group shows a clinically significant decline in bone-mineral density.
+
+## Probability of average among 50 placebo being clinicially significant decline 
+
+
+Central Limit Theorem conditions:
+Yes, change in bone mineral density is normally distributed. Since the population follows a normal distribution, we do not need a large sample size.
+
+
+```{r}
+# probability calculations
+
+# given mean
+mu = -1.8
+
+# given standard deviation
+sig = 4.3
+
+# sample size
+n = 50
+
+#probability
+
+pnorm(-2, mean = mu, sd = sig/sqrt(n))
+
+```
+
+The probability of the mean of 50 women in the placebo group being in a clinically significant decline in bone mineral density using the Central Limit Theorem (CLT) is ~37.1%. This probability is lower compared to my answer in part A for a randomly selected woman (~48.1%).
+
+
+
+# Part 2  
+
+## Data filtering
+
+
+```{r}
+# load data 
+bm = read_csv("Data/bm.csv")
+
+# filter to only keep rows from code 871
+
+
+bm = bm %>% 
+  filter(DRG_Cd == 871)
+
+```
+
+
+
+## Distribution of medical expenditure variable
+
+
+```{r}
+# mean
+mean(bm$Avg_Mdcr_Pymt_Amt)
+
+# standard deviation
+sd(bm$Avg_Mdcr_Pymt_Amt)
+# histogram
+bm %>%
+  drop_na(Avg_Mdcr_Pymt_Amt) %>%
+  ggplot(aes(x= Avg_Mdcr_Pymt_Amt)) +
+  geom_histogram(fill = "purple", color = "black", bins=50) +
+  theme_bw()
+# QQ-plot
+bm %>%
+  ggplot(aes(sample = Avg_Mdcr_Pymt_Amt)) +
+  stat_qq() +
+  stat_qq_line() +
+  theme_bw() +
+  labs(x = "Theoretical Normal Quantiles",
+       y = "Observed Quantiles for Avg Medicare Payment")
+
+
+
+
+```
+
+Mean = 13207.02 SD= 4780.852
+
+Judging from both the histogram and the QQ-plot, it appears the average payments do not come from a population with a normal distribution. The histogram shows a right-skewed distribution, and the QQ-Plot further demonstrates the data is right-skewed as it is U-shaped.
+
+
+
+
+## Bootstrap Procedure
+
+
+```{r}
+# vector to save first bootstrap sample
+set.seed(345)
+
+bm.boot = bm %>% drop_na(Avg_Mdcr_Pymt_Amt)
+
+bootstrap = data.frame(mean = rep(NA, 10000))
+
+first_bootstrap_sample = NULL
+
+for(i in 1:10000){
+  samp = sample(bm.boot$Avg_Mdcr_Pymt_Amt, size = nrow(bm.boot), replace = T)
+  
+if(i == 1){
+  first_bootstrap_sample = samp
+}
+
+# vector to save bootstrap means
+  bootstrap$mean[i] = mean(samp)
+}
+
+# save first bootstrap sample in data frame
+first_bootstrap_df = data.frame(first_bootstrap_sample)
+
+# run boostrap procedure
+bootstrap %>%
+  ggplot(aes(x = mean)) +
+  geom_histogram(fill = "blue", color = "black", binwidth = 20) +
+  theme_bw() +
+  labs(x = "Average Medicare Payment")
+
+```
+
+## Distribution of first bootstrap sample
+
+
+```{r}
+# histogram 
+first_bootstrap_df %>%
+  ggplot(aes(x= first_bootstrap_sample)) +
+  geom_histogram(fill = "pink", color = "black", bins = 60) +
+  theme_bw() +
+  labs(x = "First Bootstrap Average Medicare Payment")
+
+# QQ plot
+first_bootstrap_df %>%
+  ggplot(aes(sample = first_bootstrap_sample)) +
+  stat_qq() +
+  stat_qq_line() +
+  theme_bw() +
+  labs(x = "Theoretical Normal Quantiles",
+       y = "First Sample Quantiles for Avg Medicare Payment")
+
+# mean and standard deviation in first bootstrap sample
+first_bootstrap_df %>%
+  summarise(mn = mean(first_bootstrap_sample),
+            se = sd(first_bootstrap_sample))
+
+```
+
+Mean: 13238.63 SE: 4661.347
+
+The distribution of the first bootstrap sample is still skewed to the right as both the histogram and QQ_Plot show a right-skewed distribution. Furthermore, the mean is very similar (not exact) to the our original data, but the standard deviation of the first bootstrap sample is slightly lower than the original data.
+
+## Distribution of bootstrap means
+
+```{r}
+
+# histogram
+bootstrap %>%
+  ggplot(aes(x = mean )) +
+  geom_histogram(fill = "red", color = "black", binwidth = 20) +
+  theme_bw() +
+  labs(x = "Bootstrap Mean of Average Medicare Payment")
+
+# QQ plot
+bootstrap %>%
+  ggplot(aes(sample = mean)) +
+  stat_qq() +
+  stat_qq_line() +
+  theme_bw() +
+  labs(x = "Theoretical Normal Quantiles",
+       y = "Sample Quantiles for Avg Medicare Payment")
+
+# mean and standard deviation of bootstrap means
+bootstrap %>%
+  summarise(mn = mean(mean),
+            se = sd(mean))
+
+
+```
+
+
+Mean: 13206.89 SE: 91.69
+
+The distribution of 10000 bootstrap means follows a normal distribution according to the histogram and QQ-Plot. From the histogram, we can judge the distribution has a bell shaped curve and is roughly symmetric with no outliers present. Furthermore, from the QQ-Plot the data roughly falls along the diagonal line. The center of the distribution is 13207.94, with only a 0.92 difference from the mean of the original data, and the spread of the bootstrap means is 91.53, which is an extremely lower value compared to the original sd.
+
+
+## Confidence interval from bootstrap
+
+
+```{r}
+
+# 95% confidence interval
+
+quantile(bootstrap$mean, c(0.025,0.975))
+
+mean(bm.boot$Avg_Mdcr_Pymt_Amt) + c(-1,1)*qnorm(0.975)*sd(bm.boot$Avg_Mdcr_Pymt_Amt)/sqrt(nrow(bm.boot))
+```
+
+
+From this calculation, I am not willing to believe that the true population mean average medicare payment for someone with this DRG code is \$11,000. After constructing a 95% confidence interval, I am 95% confident that the true population mean lies between \$13,031.38 and \$13,393.84. Since, \$11,000 does not fall within in this interval I would reject the null hypothesis.
+
+
+# Session Information
+
+```{r}
+sessionInfo()
+```
